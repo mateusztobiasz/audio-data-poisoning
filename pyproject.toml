@@ -1,5 +1,5 @@
 [project]
-name = "audio-data-poisoning"
+name = "audio_data_poisoning"
 version = "0.1.0"
 description = ""
 authors = [
@@ -15,7 +15,9 @@ dependencies = [
     "matplotlib (>=3.10.8,<4.0.0)",
     "torch (>=2.11.0,<3.0.0)",
     "torchvision (>=0.26.0,<0.27.0)",
-    "torchaudio (>=2.11.0,<3.0.0)"
+    "torchaudio (>=2.11.0,<3.0.0)",
+    "pandas (>=3.0.1,<4.0.0)",
+    "yt-dlp (>=2026.3.17,<2027.0.0)"
 ]
 
 
