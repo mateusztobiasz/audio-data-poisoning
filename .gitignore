@@ -212,3 +212,6 @@ __marimo__/
 # IDE files
 .vscode/
 .idea/
+
+# Downloaded audio files
+output/

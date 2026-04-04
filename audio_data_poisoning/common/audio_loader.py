@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import os
 from tracemalloc import start
 from typing import List, Tuple
 
@@ -18,7 +19,7 @@ class AudioLoader:
         urls, ranges = self._build_urls_and_ranges()
 
         def thread_task(i):
-            start, end = self._get_batch_range(len(urls), self.threads_number, i)
+            start, end = self._get_batch_range(len(urls), i)
             self._download_audios_in_batch(urls[start:end], ranges[start:end])
 
         with ThreadPoolExecutor(max_workers=self.threads_number) as executor:
@@ -57,3 +58,10 @@ class AudioLoader:
             "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
             "outtmpl": "output/%(title)s.%(ext)s",
         }
+
+
+if __name__ == "__main__":
+    loader = AudioLoader(
+        "./audio_data_poisoning/data/audiocaps_train.csv", threads_number=1
+    )
+    loader.download_audios_parallel()
