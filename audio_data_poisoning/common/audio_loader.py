@@ -1,6 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-import os
-from tracemalloc import start
 from typing import List, Tuple
 
 import pandas as pd
