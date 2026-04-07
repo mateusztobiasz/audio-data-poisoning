@@ -60,6 +60,6 @@ class AudioLoader:
 
 if __name__ == "__main__":
     loader = AudioLoader(
-        "./audio_data_poisoning/data/audiocaps_train.csv", threads_number=1
+        "./audio_data_poisoning/data/audiocaps_train.csv", threads_number=5
     )
     loader.download_audios_parallel()

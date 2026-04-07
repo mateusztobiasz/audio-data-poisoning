@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, abstractmethod
+from abc import ABC, abstractmethod
 
 from audio_data_poisoning.common.utils import DEVICE, SingletonMeta
 
