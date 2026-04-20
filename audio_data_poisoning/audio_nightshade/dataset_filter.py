@@ -1,37 +1,45 @@
-import pandas as pd
+import random
+from typing import Callable, List
 
-from wimudp.data_poisoning.utils import (
-    CONCEPT_A,
-    CONCEPT_C_ACTION,
-    CSV_CONCEPT_C_FILE,
-    CSV_DATASET_FILE,
-    ROWS_NUMBER,
-    read_csv,
-)
+import torch
+
+from audio_data_poisoning.models.base_model import BaseModel
 
 
-def process_csv_file(
-    concept_a: str = None, concept_c_action: str = None, rows_number: int = None
-) -> pd.DataFrame:
-    concept_a = concept_a if concept_a is not None else CONCEPT_A
-    concept_c_action = (
-        concept_c_action if concept_c_action is not None else CONCEPT_C_ACTION
-    )
-    rows_number = rows_number if rows_number is not None else ROWS_NUMBER
+class DatasetFilter:
+    BATCH_SIZE: int = 64
 
-    df = read_csv(CSV_DATASET_FILE)
-    filtered_indexes = df.apply(
-        lambda row: filter_caption_len(row, concept_a, concept_c_action), axis=1
-    )
-    filtered_df = df[filtered_indexes]
+    def __init__(
+        self,
+        dataset: List[str],
+        model: BaseModel,
+        metric: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+    ):
+        self.dataset = dataset
+        self.model = model
+        self.metric = metric
 
-    return filtered_df.head(rows_number)
+    def filter(
+        self, target: str = "dog", top_k: int = 5000, n_sample: int = 100
+    ) -> List[str]:
+        similarities = self._get_similarities(target)
 
+        top_k = min(top_k, len(self.dataset))
+        top_indices = torch.topk(similarities, top_k).indices.cpu().tolist()
 
-def filter_caption_len(row: pd.Series, concept_a: str, concept_c_action: str) -> bool:
-    return concept_c_action in row["caption"] and concept_a not in row["caption"]
+        top_samples = [self.dataset[i] for i in top_indices]
+        top_samples = random.sample(top_samples, min(n_sample, len(top_samples)))
 
+        return top_samples
 
-if __name__ == "__main__":
-    df = process_csv_file()
-    df.head(ROWS_NUMBER).to_csv(CSV_CONCEPT_C_FILE)
+    def _get_similarities(self, target: str) -> torch.Tensor:
+        target_feature = self.model.get_features([target])
+        similarities = []
+
+        for i in range(0, len(self.dataset), self.BATCH_SIZE):
+            batch = self.dataset[i : i + self.BATCH_SIZE]
+            batch_features = self.model.get_features(batch)
+            batch_similarities = self.metric(target_feature, batch_features)
+            similarities.extend(batch_similarities)
+
+        return torch.tensor(similarities)
