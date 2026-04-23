@@ -16,4 +16,4 @@ class CLAP(BaseModel):
         inputs = self.processor(text=texts, return_tensors="pt", padding=True)
 
         with torch.no_grad():
-            return self.model.get_text_features(**inputs)
+            return self.model.get_text_features(**inputs).pooler_output

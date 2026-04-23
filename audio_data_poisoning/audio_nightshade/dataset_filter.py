@@ -7,7 +7,7 @@ from audio_data_poisoning.models.base_model import BaseModel
 
 
 class DatasetFilter:
-    BATCH_SIZE: int = 64
+    BATCH_SIZE: int = 100
 
     def __init__(
         self,
@@ -20,9 +20,14 @@ class DatasetFilter:
         self.metric = metric
 
     def filter(
-        self, target: str = "dog", top_k: int = 5000, n_sample: int = 100
+        self,
+        target_subject: str = "dog",
+        target_phrase: str = "dog is barking",
+        top_k: int = 5000,
+        n_sample: int = 100,
     ) -> List[str]:
-        similarities = self._get_similarities(target)
+        self.dataset = self._initial_filter(target_subject)
+        similarities = self._get_similarities(target_phrase)
 
         top_k = min(top_k, len(self.dataset))
         top_indices = torch.topk(similarities, top_k).indices.cpu().tolist()
@@ -32,14 +37,17 @@ class DatasetFilter:
 
         return top_samples
 
+    def _initial_filter(self, target: str) -> List[str]:
+        return [data for data in self.dataset if target in data.lower()]
+
     def _get_similarities(self, target: str) -> torch.Tensor:
-        target_feature = self.model.get_features([target])
-        similarities = []
+        target_feature = self.model.get_features([target]).squeeze(0)
+        features = []
 
         for i in range(0, len(self.dataset), self.BATCH_SIZE):
             batch = self.dataset[i : i + self.BATCH_SIZE]
             batch_features = self.model.get_features(batch)
-            batch_similarities = self.metric(target_feature, batch_features)
-            similarities.extend(batch_similarities)
+            features.append(batch_features)
 
-        return torch.tensor(similarities)
+        features = torch.cat(features, dim=0)
+        return self.metric(target_feature, features)
