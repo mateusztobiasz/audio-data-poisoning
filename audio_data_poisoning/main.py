@@ -12,3 +12,4 @@ if __name__ == "__main__":
     bm = CLAP()
     ds = DatasetFilter(dataset, bm, F.cosine_similarity)
     samples = ds.filter()
+    print(samples)

@@ -22,7 +22,7 @@ class DatasetFilter:
     def filter(
         self,
         target_subject: str = "dog",
-        target_phrase: str = "dog is barking",
+        target_phrase: str = "sound of dog barking",
         top_k: int = 5000,
         n_sample: int = 100,
     ) -> List[str]:
