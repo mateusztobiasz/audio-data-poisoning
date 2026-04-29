@@ -16,7 +16,7 @@ class AudioLDM(BaseModel):
 
     def __init__(
         self,
-        model_type: str = "cvssp/audioldm",
+        model_type: str = "cvssp/audioldm-s-full-v2",
         torch_dtype: torch.dtype = torch.float32,
     ):
         super().__init__(

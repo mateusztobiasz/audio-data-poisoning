@@ -9,7 +9,6 @@ class BaseModel(ABC, metaclass=SingletonMeta):
         self.model = model.from_pretrained(
             pretrained_model_name_or_path=model_type, **kwargs
         )
-        self.model.eval()
 
     @abstractmethod
     def get_features(self, *args, **kwargs):

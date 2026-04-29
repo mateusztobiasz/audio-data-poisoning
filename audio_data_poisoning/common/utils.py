@@ -1,15 +1,22 @@
 from abc import ABCMeta
+from email.mime import audio
 from threading import Lock
 
+import scipy
+import scipy
 import soundfile as sf
 import torch
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def save_audio(waveform: torch.Tensor, path: str, sr: int = 16000):
-    audio = waveform.detach().cpu().numpy()
-    sf.write(path, audio, sr)
+def save_audio(
+    waveform: torch.Tensor, path: str, sr: int = 16000, transform: bool = True
+):
+    if transform:
+        waveform = waveform.detach().cpu().numpy()
+
+    scipy.io.wavfile.write(path, rate=sr, data=waveform)
 
 
 class SingletonMeta(ABCMeta):

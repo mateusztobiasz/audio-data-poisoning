@@ -1,3 +1,4 @@
+import os
 import random
 from typing import Callable, List
 
@@ -7,6 +8,7 @@ from audio_data_poisoning.models.base_model import BaseModel
 
 
 class DatasetFilter:
+    OUTPUT_DIR: str = "./audio_data_poisoning/data/text_samples"
     BATCH_SIZE: int = 100
 
     def __init__(
@@ -18,13 +20,15 @@ class DatasetFilter:
         self.dataset = dataset
         self.model = model
         self.metric = metric
+        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
 
     def filter(
         self,
         target_subject: str = "dog",
-        target_phrase: str = "sound of dog barking",
-        top_k: int = 5000,
+        target_phrase: str = "a dog is barking",
+        top_k: int = 1000,
         n_sample: int = 100,
+        save: bool = True,
     ) -> List[str]:
         self.dataset = self._initial_filter(target_subject)
         similarities = self._get_similarities(target_phrase)
@@ -34,6 +38,11 @@ class DatasetFilter:
 
         top_samples = [self.dataset[i] for i in top_indices]
         top_samples = random.sample(top_samples, min(n_sample, len(top_samples)))
+
+        if save:
+            with open(f"{self.OUTPUT_DIR}/samples.txt", "w") as f:
+                for sample in top_samples:
+                    f.write(sample + "\n")
 
         return top_samples
 
