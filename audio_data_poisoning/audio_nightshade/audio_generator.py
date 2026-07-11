@@ -1,23 +1,23 @@
 import os
+from typing import List
 
-from audio_data_poisoning.common.utils import save_audio
+from audio_data_poisoning.common.utils import create_dataset, save_audio
 from audio_data_poisoning.models.base_model import BaseModel
 
 
 class AudioGenerator:
     OUTPUT_DIR: str = "./audio_data_poisoning/data/gen_samples"
+    DATASET_DIR: str = "./audio_data_poisoning/data"
 
     def __init__(self, model: BaseModel):
         self.model = model
-        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
 
     def generate(
         self,
         n: int = 100,
         target_phrase: str = "a clear and high-quality recording of a cat meowing loud",
         audio_length: float = 10.0,
-        save: bool = True,
-    ) -> list:
+    ) -> List[str]:
         audios = []
         for i in range(n):
             output = self.model.model(
@@ -26,13 +26,15 @@ class AudioGenerator:
                 audio_length_in_s=audio_length,
             )
             audio = output.audios[0]
-            audios.append(audio)
+            audio_path = f"{self.OUTPUT_DIR}/{target_phrase.replace(' ', '_')}_{i}.wav"
 
-            if save:
-                save_audio(
-                    audio,
-                    f"{self.OUTPUT_DIR}/{target_phrase.replace(' ', '_')}_{i}.wav",
-                    transform=False,
-                )
+            save_audio(
+                audio,
+                audio_path,
+                transform=False,
+            )
 
+            audios.append(audio_path)
+
+        create_dataset(audios, f"{self.DATASET_DIR}/gen_samples.csv")
         return audios

@@ -1,7 +1,9 @@
 from abc import ABCMeta
+from ast import List
 from email.mime import audio
 from threading import Lock
 
+import pandas as pd
 import scipy
 import scipy
 import soundfile as sf
@@ -17,6 +19,20 @@ def save_audio(
         waveform = waveform.detach().cpu().numpy()
 
     scipy.io.wavfile.write(path, rate=sr, data=waveform)
+
+
+def create_dataset(
+    data: list,
+    file_path: str,
+    audio_column: str = "audio_path",
+    prompt_column: str | None = None,
+):
+    if prompt_column:
+        df = pd.DataFrame(data, columns=[audio_column, prompt_column])
+    else:
+        df = pd.DataFrame(data, columns=[audio_column])
+
+    df.to_csv(file_path, index=False)
 
 
 class SingletonMeta(ABCMeta):

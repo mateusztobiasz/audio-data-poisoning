@@ -60,7 +60,7 @@ class AudioLoader:
             "download_ranges": download_range_func(None, [time_range]),
             "force_keyframes_at_cuts": True,
             "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-            "outtmpl": f"output/{caption.replace(' ', '_')}.%(ext)s",
+            "outtmpl": f"./audio_data_poisoning/data/yt_audios/{caption.replace(' ', '_')}.%(ext)s",
         }
 
 
