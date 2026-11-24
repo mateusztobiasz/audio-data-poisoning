@@ -1,12 +1,15 @@
 import random
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 import torch
 
+from audio_data_poisoning.common.utils import create_dataset
 from audio_data_poisoning.models.base_model import BaseModel
 
 
 class DatasetFilter:
+    DATASET_DIR: str = "./audio_data_poisoning/data"
+    YT_AUDIOS_DIR: str = "./audio_data_poisoning/data/yt_audios"
     BATCH_SIZE: int = 100
 
     def __init__(
@@ -21,11 +24,11 @@ class DatasetFilter:
 
     def filter(
         self,
-        target_subject: str = "dog",
-        target_phrase: str = "dog is barking",
-        top_k: int = 5000,
+        target_subject: str,
+        target_phrase: str,
+        top_k: int = 1000,
         n_sample: int = 100,
-    ) -> List[str]:
+    ) -> List[Tuple[str, str]]:
         self.dataset = self._initial_filter(target_subject)
         similarities = self._get_similarities(target_phrase)
 
@@ -34,11 +37,25 @@ class DatasetFilter:
 
         top_samples = [self.dataset[i] for i in top_indices]
         top_samples = random.sample(top_samples, min(n_sample, len(top_samples)))
+        top_samples = [
+            (
+                f"{self.YT_AUDIOS_DIR}/{top_sample[0].replace(' ', '_')}",
+                top_sample[0],
+                top_sample[1],
+                top_sample[2],
+            )
+            for top_sample in top_samples
+        ]
 
-        return top_samples
+        create_dataset(
+            top_samples,
+            f"{self.DATASET_DIR}/filtered_samples.csv",
+            additonal_columns=["caption", "youtube_id", "start_time"],
+        )
+        return f"{self.DATASET_DIR}/filtered_samples.csv"
 
     def _initial_filter(self, target: str) -> List[str]:
-        return [data for data in self.dataset if target in data.lower()]
+        return [data for data in self.dataset if target in data[0].lower()]
 
     def _get_similarities(self, target: str) -> torch.Tensor:
         target_feature = self.model.get_features([target]).squeeze(0)
@@ -46,6 +63,7 @@ class DatasetFilter:
 
         for i in range(0, len(self.dataset), self.BATCH_SIZE):
             batch = self.dataset[i : i + self.BATCH_SIZE]
+            batch = [data[0] for data in batch]
             batch_features = self.model.get_features(batch)
             features.append(batch_features)
 

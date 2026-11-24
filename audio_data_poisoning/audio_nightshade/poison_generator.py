@@ -1,82 +1,105 @@
+import os
+from typing import List
+
 import pandas as pd
 import torch
+import torch.nn.functional as F
 
-from wimudp.data_poisoning.nightshade.pipeline import Pipeline
-from wimudp.data_poisoning.nightshade.vocoder import Vocoder
-from wimudp.data_poisoning.utils import (
-    AUDIOS_DIR,
-    AUDIOS_SAMPLES_DIR,
-    CSV_NS_SAMPLES_FILE,
-    check_audio_file,
-    normalize_tensor,
-    pad_waveforms,
-    read_csv,
-)
-
-MAX_EPOCHS = 500
-EPS = 0.05
+from audio_data_poisoning.common.utils import create_dataset, save_audio
+from audio_data_poisoning.models.base_model import BaseModel
 
 
-def generate_poison(
-    row: pd.Series, vocoder: Vocoder, pipeline: Pipeline
-) -> torch.Tensor:
-    w_1 = vocoder.load_audio(f"{AUDIOS_SAMPLES_DIR}/{row['audio']}")
-    w_2 = vocoder.load_audio(f"{AUDIOS_SAMPLES_DIR}/big.wav")
+class PoisonGenerator:
+    OUTPUT_DIR: str = "./audio_data_poisoning/data/poison_samples"
+    DATASET_DIR: str = "./audio_data_poisoning/data"
 
-    w_1, w_2 = pad_waveforms(w_1, w_2)
-    w_1_mel = vocoder.gen_mel(w_1)
-    w_2_mel = vocoder.gen_mel(w_2)
-    w_1_mel_norm = normalize_tensor(w_1_mel)
-    w_2_mel_norm = normalize_tensor(w_2_mel)
+    def __init__(
+        self,
+        model: BaseModel,
+        alpha: float = 10.0,  # penalty weight
+        p: float = 0.05,  # perturbation budget
+        steps: int = 100,  # optimization steps
+        lr: float = 0.01,  # learning rate
+    ):
+        self.model = model
+        self.alpha = alpha
+        self.p = p
+        self.steps = steps
+        self.lr = lr
+        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
 
-    target_latent = pipeline.get_latent(w_2_mel_norm)
-    target_latent = target_latent.detach()
+    def poison_dataset(
+        self,
+        source_dataset: pd.DataFrame,
+        target_dataset: pd.DataFrame,
+        save: bool = True,
+    ) -> pd.DataFrame:
+        poison_pairs = []
 
-    delta = torch.clone(w_1_mel_norm) * 0.0
-    best_delta = torch.clone(delta)
-    max_change = EPS * 2
-    step_size = max_change
-    min_loss = float("inf")
+        for i, ((_, source_row), (_, target_row)) in enumerate(
+            zip(source_dataset.iterrows(), target_dataset.iterrows())
+        ):
 
-    for i in range(MAX_EPOCHS):
-        actual_step_size = step_size - (step_size - step_size / 100) / MAX_EPOCHS * i
-        delta.requires_grad_()
+            poisoned_mel = self._poison_audio(
+                source_row["audio_path"], target_row["audio_path"]
+            )
 
-        pert_mel = torch.clamp(delta + w_1_mel_norm, -1, 1)
-        per_latent = pipeline.get_latent(pert_mel)
-        diff_latent = per_latent - target_latent
+            poison_path = f"{self.OUTPUT_DIR}/poison_{i}.wav"
+            if save:
+                wav = self.model.mel_to_audio(poisoned_mel, save=False)
+                save_audio(wav, poison_path, sr=self.model.SR)
 
-        loss = diff_latent.norm()
-        grad = torch.autograd.grad(loss, delta)[0]
+            poison_pairs.append(
+                {
+                    "audio_path": poison_path,
+                    "prompt": source_row["prompt"],
+                }
+            )
 
-        if min_loss > loss:
-            min_loss = loss
-            best_delta = torch.clone(delta)
+        create_dataset(
+            poison_pairs,
+            f"{self.DATASET_DIR}/final_samples.csv",
+            additional_columns=["caption"],
+        )
+        return pd.DataFrame(poison_pairs)
 
-        delta = delta - torch.sign(grad) * actual_step_size
-        delta = torch.clamp(delta, -max_change, max_change)
-        delta = delta.detach()
+    def _poison_audio(
+        self,
+        source_path: str,
+        target_path: str,
+    ) -> torch.Tensor:
 
-        if i % 20 == 0:
-            print(f"[{row['audio']}] in {i}. epoch - loss: {loss}")
-    print(f"[{row['audio']}] min loss: {min_loss}")
-    final_mel_norm = torch.clamp(best_delta + w_1_mel_norm, -1, 1)
-    return normalize_tensor(final_mel_norm, True, w_1_mel.max(), w_1_mel.min())
+        device = self.model.model.device
+        source_mel = self.model.audio_to_mel(source_path).to(device).detach()
 
+        with torch.no_grad():
+            target_latent = self.model.get_features(target_path)
 
-def generate_all(df: pd.DataFrame):
-    vocoder = Vocoder()
-    pipeline = Pipeline()
+        delta = torch.zeros_like(source_mel, requires_grad=True, device=device)
+        optimizer = torch.optim.Adam([delta], lr=self.lr)
 
-    for _, row in df.iterrows():
-        if not check_audio_file(AUDIOS_DIR, row["audio"]):
-            final_mel = generate_poison(row, vocoder, pipeline)
-            final_wav = vocoder.gen_wav(final_mel)
-            vocoder.save_audio(final_wav, f"{AUDIOS_DIR}/{row['audio']}")
-        else:
-            print(f"Poison sample already present for: {row['audio']}")
+        for step in range(self.steps):
+            optimizer.zero_grad()
 
+            poisoned_mel = source_mel + delta
 
-if __name__ == "__main__":
-    df = read_csv(CSV_NS_SAMPLES_FILE)
-    generate_all(df)
+            poisoned_latent = self.model.model.vae.encode(
+                poisoned_mel
+            ).latent_dist.sample()
+
+            feature_loss = F.mse_loss(poisoned_latent, target_latent)
+            delta_norm = torch.norm(delta)
+            penalty = self.alpha * torch.clamp(delta_norm - self.p, min=0)
+
+            loss = feature_loss + penalty
+            loss.backward()
+            optimizer.step()
+
+            if step % 50 == 0:
+                print(
+                    f"  step {step}: feature_loss={feature_loss.item():.4f}, "
+                    f"penalty={penalty.item():.4f}, "
+                    f"||delta||={delta_norm.item():.4f}"
+                )
+
+        return (source_mel + delta).detach()

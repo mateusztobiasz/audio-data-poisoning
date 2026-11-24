@@ -4,7 +4,6 @@ import torch
 
 from diffusers import AudioLDMPipeline
 
-from audio_data_poisoning.common.utils import save_audio
 from audio_data_poisoning.models.base_model import BaseModel
 
 
@@ -16,7 +15,7 @@ class AudioLDM(BaseModel):
 
     def __init__(
         self,
-        model_type: str = "cvssp/audioldm",
+        model_type: str = "cvssp/audioldm-s-full-v2",
         torch_dtype: torch.dtype = torch.float32,
     ):
         super().__init__(
@@ -30,16 +29,13 @@ class AudioLDM(BaseModel):
         with torch.no_grad():
             return self.model.vae.encode(audio).latent_dist.sample()
 
-    def mel_to_audio(self, mel: torch.Tensor, save: bool = True) -> torch.Tensor:
+    def mel_to_audio(self, mel: torch.Tensor) -> torch.Tensor:
         mel = mel.to(device=self.model.device)
         mel = mel.squeeze().squeeze()
         mel = mel.T
 
         with torch.no_grad():
             wav = self.model.vocoder(mel)
-
-        if save:
-            save_audio(wav, "output/test_1.wav", sr=self.SR)
 
         return wav
 
@@ -60,9 +56,3 @@ class AudioLDM(BaseModel):
         mel = (mel - mel.min()) / (mel.max() - mel.min()) * 2 - 1
 
         return torch.tensor(mel, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-
-
-if __name__ == "__main__":
-    model = AudioLDM()
-    mel = model.audio_to_mel("./output/test.wav")
-    model.mel_to_audio(mel)
