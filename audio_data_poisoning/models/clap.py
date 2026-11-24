@@ -14,7 +14,9 @@ class CLAP(BaseModel):
         self.model.eval()
 
     def get_features(self, texts: List[str], *args, **kwargs) -> torch.Tensor:
-        inputs = self.processor(text=texts, return_tensors="pt", padding=True)
+        inputs = self.processor(text=texts, return_tensors="pt", padding=True).to(
+            self.model.device
+        )
 
         with torch.no_grad():
             return self.model.get_text_features(**inputs)

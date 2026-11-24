@@ -1,7 +1,6 @@
 from abc import ABCMeta
-from ast import List
-from email.mime import audio
 from threading import Lock
+from typing import List
 
 import pandas as pd
 import scipy
@@ -25,10 +24,10 @@ def create_dataset(
     data: list,
     file_path: str,
     audio_column: str = "audio_path",
-    prompt_column: str | None = None,
+    additonal_columns: List[str] = None,
 ):
-    if prompt_column:
-        df = pd.DataFrame(data, columns=[audio_column, prompt_column])
+    if additonal_columns:
+        df = pd.DataFrame(data, columns=[audio_column] + additonal_columns)
     else:
         df = pd.DataFrame(data, columns=[audio_column])
 

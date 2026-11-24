@@ -11,6 +11,11 @@ class AudioLoader:
 
     def __init__(self, dataset_path: str, threads_number: int = 10):
         self.df = pd.read_csv(dataset_path)
+        len(self.df)
+        for index, row in self.df.iterrows():
+            print(
+                f"Row {index}: {row['caption']}, {row['youtube_id']}, {row['start_time']}"
+            )
         self.threads_number = threads_number
 
     def download_audios_parallel(self):
@@ -59,13 +64,7 @@ class AudioLoader:
             "format": "bestaudio/best",
             "download_ranges": download_range_func(None, [time_range]),
             "force_keyframes_at_cuts": True,
+            "cookiesfrombrowser": ("firefox",),
             "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
             "outtmpl": f"./audio_data_poisoning/data/yt_audios/{caption.replace(' ', '_')}.%(ext)s",
         }
-
-
-if __name__ == "__main__":
-    loader = AudioLoader(
-        "./audio_data_poisoning/data/audiocaps_train.csv", threads_number=5
-    )
-    loader.download_audios_parallel()

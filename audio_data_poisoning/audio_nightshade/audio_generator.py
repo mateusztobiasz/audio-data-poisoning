@@ -11,6 +11,7 @@ class AudioGenerator:
 
     def __init__(self, model: BaseModel):
         self.model = model
+        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
 
     def generate(
         self,

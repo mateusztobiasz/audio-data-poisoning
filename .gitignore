@@ -211,6 +211,7 @@ __marimo__/
 *.wav
 *.mp3
 *.txt
+data/
 
 # IDE files
 .vscode/
